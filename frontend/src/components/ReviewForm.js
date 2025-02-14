@@ -1,23 +1,32 @@
 // components/ReviewForm.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useParams } from 'react-router-dom';
-import { addReview } from '../features/reviews/reviewsSlice';
+import axios from 'axios';
+import { addReview, resetAddReviewStatus } from '../features/reviews/reviewsSlice';
 
 const ReviewForm = () => {
   const { bookId } = useParams();
   const dispatch = useDispatch();
-  const { user } = useSelector((state) => state.auth); // Get current user from auth state
+  const { user } = useSelector((state) => state.auth);
   const { status, error } = useSelector((state) => state.reviews);
   
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [submitError, setSubmitError] = useState(null);
 
+  // Reset form and status when unmounting
+  useEffect(() => {
+    return () => {
+      dispatch(resetAddReviewStatus());
+    };
+  }, [dispatch]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitError(null);
 
+    // Validation checks
     if (!user) {
       setSubmitError('Please login to submit a review');
       return;
@@ -28,20 +37,44 @@ const ReviewForm = () => {
       return;
     }
 
-    const reviewData = {
-      bookId,
-      userId: user.id,
-      rating: Number(rating),
-      comment: comment.trim()
-    };
+    if (comment.trim().length < 3) {
+      setSubmitError('Comment must be at least 3 characters long');
+      return;
+    }
 
     try {
-      await dispatch(addReview(reviewData)).unwrap();
-      setComment(''); // Clear form on success
-      setRating(5);
+      const reviewData = {
+        bookId,
+        userId: user.id,
+        rating: Number(rating),
+        comment: comment.trim()
+      };
+
+      // Make direct API call instead of using Redux
+      const response = await axios.post('http://localhost:5100/api/reviews', reviewData, {
+        headers: {
+          'Content-Type': 'application/json',
+          // Add authorization if needed
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (response.data.success) {
+        setComment('');
+        setRating(5);
+        setSubmitError(null);
+        // Optional: Add success message or callback
+      } else {
+        setSubmitError(response.data.message || 'Failed to submit review');
+      }
     } catch (err) {
       console.error('Failed to submit review:', err);
-      setSubmitError(err.message || 'Failed to submit review');
+      
+      const errorMessage = err.response?.data?.message 
+        || err.response?.data?.error 
+        || 'Failed to submit review';
+      
+      setSubmitError(errorMessage);
     }
   };
 
@@ -64,7 +97,7 @@ const ReviewForm = () => {
             <option value="1">1 - Poor</option>
           </select>
         </div>
-        
+
         <div className="mb-3">
           <label className="form-label">Comment</label>
           <textarea
@@ -75,7 +108,12 @@ const ReviewForm = () => {
             rows="4"
             placeholder="Share your thoughts about this book..."
             required
+            minLength="3"
+            maxLength="1000"
           />
+          <small className="text-muted">
+            {comment.length}/1000 characters
+          </small>
         </div>
 
         {(error || submitError) && (
@@ -84,18 +122,25 @@ const ReviewForm = () => {
           </div>
         )}
 
-        {status === 'loading' && (
-          <div className="alert alert-info" role="alert">
-            Submitting review...
+        {status === 'succeeded' && (
+          <div className="alert alert-success" role="alert">
+            Review submitted successfully!
           </div>
         )}
 
-        <button 
-          type="submit" 
+        <button
+          type="submit"
           className="btn btn-primary"
           disabled={status === 'loading'}
         >
-          {status === 'loading' ? 'Submitting...' : 'Submit Review'}
+          {status === 'loading' ? (
+            <>
+              <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+              Submitting...
+            </>
+          ) : (
+            'Submit Review'
+          )}
         </button>
       </form>
     </div>

@@ -1,0 +1,12 @@
+{
+  "name": "book-review-platform",
+  "version": "1.0.0",
+  "description": "A full-stack book review platform where users can browse books, read and write reviews, and rate books. Built with **React** (frontend) and **Node.js** (backend) using **Express** and **MongoDB**.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
